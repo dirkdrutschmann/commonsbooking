@@ -442,6 +442,36 @@ class BookingTest extends CustomPostTypeTest {
 		$this->assertEquals( $bookingModel->post_name, $sameBookingModel->post_name );
 	}
 
+	public function testNewBookingIsDeniedWhenCurrentUserHasAnUnconfirmedBooking() {
+		$firstBookingId     = Booking::handleBookingRequest(
+			$this->itemId,
+			$this->locationId,
+			'unconfirmed',
+			null,
+			null,
+			strtotime( self::CURRENT_DATE ),
+			strtotime( '+1 day', strtotime( self::CURRENT_DATE ) ),
+			null,
+			null
+		);
+		$this->bookingIds[] = $firstBookingId;
+
+		$this->expectException( \CommonsBooking\Exception\BookingDeniedException::class );
+		$this->expectExceptionMessage( 'You already have an unconfirmed booking.' );
+
+		Booking::handleBookingRequest(
+			$this->itemId,
+			$this->locationId,
+			'unconfirmed',
+			null,
+			null,
+			strtotime( '+3 days', strtotime( self::CURRENT_DATE ) ),
+			strtotime( '+4 days', strtotime( self::CURRENT_DATE ) ),
+			null,
+			null
+		);
+	}
+
 	/**
 	 * This test is meant to test a bunch of behaviour that can occur
 	 * when a booking is created as unconfirmed first, then deleted by the cronjob and then either confirmed or canceled.

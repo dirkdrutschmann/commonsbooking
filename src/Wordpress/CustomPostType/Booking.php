@@ -364,24 +364,30 @@ class Booking extends Timeframe {
 		// New booking
 		if ( empty( $booking ) ) {
 			if ( $post_status !== 'unconfirmed' ) {
-				// New bookings always have to be unconfirmed
+				// New bookings always have to be unconfirmed.
 				throw new BookingDeniedException( __( 'Invalid booking request. Please try again.', 'commonsbooking' ) );
 			}
 
-			$unconfirmedBookings = array_filter(
-				\CommonsBooking\Repository\Booking::getForCurrentUser( true, null, [ 'unconfirmed' ] ),
-				fn( $booking ) => intval( $booking->getPost()->post_author ) === get_current_user_id() // getForCurrentUser also gets managed bookings, these should be ignored
-			);
+			// Only two results are needed: one existing booking gets a direct link,
+			// two results are enough to show the multiple-bookings notice. Keep this
+			// query user-scoped and paginated so large booking tables stay cheap.
+			$unconfirmedBookings = \CommonsBooking\Repository\Booking::getForUserPaginated(
+				wp_get_current_user(),
+				1,
+				2,
+					[],
+					[ 'unconfirmed' ]
+				);
 			if ( ! empty( $unconfirmedBookings ) ) {
 				if ( count( $unconfirmedBookings ) === 1 ) {
 					$bookingLink = reset( $unconfirmedBookings )->bookingLink();
 					throw new BookingDeniedException(
 						__( 'You already have an unconfirmed booking. Please confirm / cancel your existing booking or wait for it to expire.', 'commonsbooking' ) .
-						'<br>' . $bookingLink
-					);
-				} else {
-					throw new BookingDeniedException( __( 'You already have unconfirmed bookings. Please wait a few minutes for them to expire or confirm/cancel them before creating a new one.', 'commonsbooking' ) );
+							'<br>' . $bookingLink
+						);
 				}
+
+				throw new BookingDeniedException( __( 'You already have unconfirmed bookings. Please wait a few minutes for them to expire or confirm/cancel them before creating a new one.', 'commonsbooking' ) );
 			}
 			$postarr['post_name']  = Helper::generateRandomString();
 			$postarr['meta_input'] = array(
